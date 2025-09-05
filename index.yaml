@@ -29,6 +29,6 @@ entries:
     - https://github.com/elastic/beats
     type: application
     urls:
-    - https://github.com/Mubin8942/elk-stack-test.git/elk-stack-1.0.0.tgz
+    - https://mubin8942.github.io/elk-stack/elk-stack-1.0.0.tgz
     version: 1.0.0
 generated: "2025-09-06T02:46:29.3966497+06:00"
