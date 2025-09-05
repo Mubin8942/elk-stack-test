@@ -1,0 +1,180 @@
+{{- if .Values.elasticsearch.enabled }}
+# Elasticsearch ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-elasticsearch-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+data:
+  elasticsearch.yml: |
+    cluster.name: "docker-cluster"
+    network.host: 0.0.0.0
+    discovery.type: single-node
+    xpack.security.enabled: true
+    {{- if .Values.elasticsearch.ssl.enabled }}
+    xpack.security.transport.ssl.enabled: true
+    xpack.security.transport.ssl.verification_mode: certificate
+    xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+    xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+    xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certs/ca.crt
+    xpack.security.http.ssl.enabled: true
+    xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+    xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+    xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certs/ca.crt
+    {{- end }}
+---
+# Elasticsearch Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-elasticsearch
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+spec:
+  replicas: {{ .Values.elasticsearch.replicas }}
+  selector:
+    matchLabels:
+      {{- include "elk-stack.elasticsearch.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "elk-stack.elasticsearch.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: elasticsearch
+        image: {{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}
+        imagePullPolicy: {{ .Values.elasticsearch.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.elasticsearch.service.httpPort }}
+          name: http
+        - containerPort: {{ .Values.elasticsearch.service.transportPort }}
+          name: transport
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: ES_JAVA_OPTS
+          value: {{ .Values.elasticsearch.env.esJavaOpts | quote }}
+        - name: xpack.security.enabled
+          value: "true"
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        - name: xpack.security.transport.ssl.enabled
+          value: "true"
+        - name: xpack.security.http.ssl.enabled
+          value: "true"
+        {{- end }}
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "elk-stack.fullname" . }}-elasticsearch-secrets
+              key: password
+        volumeMounts:
+        - name: elasticsearch-config
+          mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          subPath: elasticsearch.yml
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        - name: elasticsearch-certs
+          mountPath: /usr/share/elasticsearch/config/certs
+          readOnly: true
+        {{- end }}
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+        resources:
+          {{- toYaml .Values.elasticsearch.resources | nindent 10 }}
+      volumes:
+      - name: elasticsearch-config
+        configMap:
+          name: {{ include "elk-stack.fullname" . }}-elasticsearch-config
+      {{- if .Values.elasticsearch.ssl.enabled }}
+      - name: elasticsearch-certs
+        secret:
+          secretName: {{ include "elk-stack.fullname" . }}-certs
+      {{- end }}
+      - name: elasticsearch-data
+        {{- if .Values.elasticsearch.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "elk-stack.fullname" . }}-elasticsearch-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      initContainers:
+      - name: increase-vm-max-map
+        image: busybox
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
+      - name: increase-fd-ulimit
+        image: busybox
+        command: ["sh", "-c", "ulimit -n 65536"]
+        securityContext:
+          privileged: true
+---
+# Elasticsearch Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-elasticsearch
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+spec:
+  selector:
+    {{- include "elk-stack.elasticsearch.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.elasticsearch.service.httpPort }}
+      targetPort: {{ .Values.elasticsearch.service.httpPort }}
+      protocol: TCP
+    - name: transport
+      port: {{ .Values.elasticsearch.service.transportPort }}
+      targetPort: {{ .Values.elasticsearch.service.transportPort }}
+      protocol: TCP
+  type: {{ .Values.elasticsearch.service.type }}
+---
+# Service for internal access (without release name)
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+spec:
+  selector:
+    {{- include "elk-stack.elasticsearch.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.elasticsearch.service.httpPort }}
+      targetPort: {{ .Values.elasticsearch.service.httpPort }}
+      protocol: TCP
+    - name: transport
+      port: {{ .Values.elasticsearch.service.transportPort }}
+      targetPort: {{ .Values.elasticsearch.service.transportPort }}
+      protocol: TCP
+  type: ClusterIP
+{{- if .Values.elasticsearch.persistence.enabled }}
+---
+# Elasticsearch PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-elasticsearch-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.elasticsearch.persistence.size }}
+  {{- if .Values.elasticsearch.persistence.storageClassName }}
+  storageClassName: {{ .Values.elasticsearch.persistence.storageClassName }}
+  {{- end }}
+{{- end }}
+{{- end }}

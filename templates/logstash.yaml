@@ -1,0 +1,153 @@
+{{- if .Values.logstash.enabled }}
+# Logstash Pipeline ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-logstash-pipeline
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+data:
+  pipeline.conf: |
+    input {
+      beats {
+        port => {{ .Values.logstash.service.port }}
+      }
+    }
+
+    filter {
+      if [fields][log_type] == "apache" {
+        grok {
+          match => { "message" => "%{COMBINEDAPACHELOG}" }
+        }
+      }
+      
+      # Add Kubernetes metadata
+      if [kubernetes] {
+        mutate {
+          add_field => { "k8s_namespace" => "%{[kubernetes][namespace]}" }
+          add_field => { "k8s_pod" => "%{[kubernetes][pod][name]}" }
+          add_field => { "k8s_container" => "%{[kubernetes][container][name]}" }
+        }
+      }
+    }
+
+    output {
+      elasticsearch {
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        hosts => ["https://elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"]
+        {{- else }}
+        hosts => ["http://elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"]
+        {{- end }}
+        user => "elastic"
+        password => {{ .Values.elasticsearch.auth.elasticPassword | quote }}
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        ssl_enabled => true
+        ssl_certificate_authorities => ["/usr/share/logstash/config/certs/ca.crt"]
+        {{- end }}
+        index => "logstash-%{+YYYY.MM.dd}"
+      }
+      
+      # Debug output
+      stdout { 
+        codec => rubydebug 
+      }
+    }
+---
+# Logstash Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-logstash
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: logstash
+spec:
+  replicas: {{ .Values.logstash.replicas }}
+  selector:
+    matchLabels:
+      {{- include "elk-stack.logstash.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "elk-stack.logstash.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: logstash
+        image: {{ .Values.logstash.image.repository }}:{{ .Values.logstash.image.tag }}
+        imagePullPolicy: {{ .Values.logstash.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.logstash.service.port }}
+          name: beats
+        volumeMounts:
+        - name: pipeline-config
+          mountPath: /usr/share/logstash/pipeline
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        - name: certs
+          mountPath: /usr/share/logstash/config/certs
+          readOnly: true
+        {{- end }}
+        env:
+        - name: LS_JAVA_OPTS
+          value: {{ .Values.logstash.env.lsJavaOpts | quote }}
+        resources:
+          {{- toYaml .Values.logstash.resources | nindent 10 }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.logstash.service.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.logstash.service.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      volumes:
+      - name: pipeline-config
+        configMap:
+          name: {{ include "elk-stack.fullname" . }}-logstash-pipeline
+      {{- if .Values.elasticsearch.ssl.enabled }}
+      - name: certs
+        secret:
+          secretName: {{ include "elk-stack.fullname" . }}-certs
+      {{- end }}
+---
+# Logstash Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-logstash
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: logstash
+spec:
+  selector:
+    {{- include "elk-stack.logstash.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: beats
+      protocol: TCP
+      port: {{ .Values.logstash.service.port }}
+      targetPort: {{ .Values.logstash.service.port }}
+  type: {{ .Values.logstash.service.type }}
+---
+# Service for internal access (without release name)
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: logstash
+spec:
+  selector:
+    {{- include "elk-stack.logstash.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: beats
+      protocol: TCP
+      port: {{ .Values.logstash.service.port }}
+      targetPort: {{ .Values.logstash.service.port }}
+  type: ClusterIP
+{{- end }}

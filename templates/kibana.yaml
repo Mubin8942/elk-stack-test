@@ -1,0 +1,147 @@
+{{- if .Values.kibana.enabled }}
+# Kibana ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-kibana-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+data:
+  kibana.yml: |
+    server.name: kibana
+    server.host: "0.0.0.0"
+    {{- if .Values.elasticsearch.ssl.enabled }}
+    elasticsearch.hosts: "https://elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"
+    {{- else }}
+    elasticsearch.hosts: "http://elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"
+    {{- end }}
+    elasticsearch.username: "kibana_system"
+    elasticsearch.password: {{ .Values.kibana.auth.kibanaPassword | quote }}
+    {{- if .Values.elasticsearch.ssl.enabled }}
+    elasticsearch.ssl.certificateAuthorities: /usr/share/kibana/config/certs/ca.crt
+    elasticsearch.ssl.verificationMode: certificate
+    {{- end }}
+    xpack.encryptedSavedObjects.encryptionKey: {{ .Values.kibana.encryptionKey | quote }}
+---
+# Kibana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-kibana
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
+spec:
+  replicas: {{ .Values.kibana.replicas }}
+  selector:
+    matchLabels:
+      {{- include "elk-stack.kibana.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "elk-stack.kibana.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: kibana
+        image: {{ .Values.kibana.image.repository }}:{{ .Values.kibana.image.tag }}
+        imagePullPolicy: {{ .Values.kibana.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.kibana.service.port }}
+          name: http
+        env:
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        - name: ELASTICSEARCH_HOSTS
+          value: "https://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"
+        {{- else }}
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"
+        {{- end }}
+        - name: ELASTICSEARCH_USERNAME
+          value: "kibana_system"
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "elk-stack.fullname" . }}-kibana-secrets
+              key: password
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
+          value: "/usr/share/kibana/config/certs/ca.crt"
+        - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
+          value: "certificate"
+        {{- end }}
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        {{- if .Values.elasticsearch.ssl.enabled }}
+        - name: elasticsearch-certs
+          mountPath: /usr/share/kibana/config/certs
+          readOnly: true
+        {{- end }}
+        resources:
+          {{- toYaml .Values.kibana.resources | nindent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: {{ .Values.kibana.service.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: {{ .Values.kibana.service.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: {{ include "elk-stack.fullname" . }}-kibana-config
+      {{- if .Values.elasticsearch.ssl.enabled }}
+      - name: elasticsearch-certs
+        secret:
+          secretName: {{ include "elk-stack.fullname" . }}-certs
+      {{- end }}
+---
+# Kibana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-kibana
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
+spec:
+  selector:
+    {{- include "elk-stack.kibana.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.kibana.service.port }}
+      targetPort: {{ .Values.kibana.service.port }}
+      protocol: TCP
+      {{- if eq .Values.kibana.service.type "NodePort" }}
+      nodePort: {{ .Values.kibana.service.nodePort }}
+      {{- end }}
+  type: {{ .Values.kibana.service.type }}
+---
+# Service for internal access (without release name)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
+spec:
+  selector:
+    {{- include "elk-stack.kibana.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.kibana.service.port }}
+      targetPort: {{ .Values.kibana.service.port }}
+      protocol: TCP
+  type: ClusterIP
+{{- end }}
