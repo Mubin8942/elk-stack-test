@@ -16,6 +16,7 @@ spec:
       name: {{ include "elk-stack.fullname" . }}-cert-generator
     spec:
       restartPolicy: Never
+      serviceAccountName: {{ include "elk-stack.fullname" . }}-cert-generator
       containers:
       - name: cert-generator
         image: alpine/openssl:latest
@@ -24,6 +25,12 @@ spec:
         - -c
         - |
           set -e
+          
+          # Install kubectl
+          apk add --no-cache curl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
           
           # Create directory for certificates
           mkdir -p /certs
@@ -61,26 +68,66 @@ spec:
           
           echo "Certificates generated successfully!"
           ls -la /certs/
+          
+          echo "Creating Kubernetes secret..."
+          kubectl create secret generic {{ include "elk-stack.fullname" . }}-certs \
+            -n {{ .Values.global.namespace }} \
+            --from-file=/certs/ \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "Secret created successfully!"
         volumeMounts:
         - name: certs-volume
           mountPath: /certs
       volumes:
       - name: certs-volume
         emptyDir: {}
-      initContainers:
-      - name: create-certs-secret
-        image: bitnami/kubectl:latest
-        command:
-        - /bin/sh
-        - -c
-        - |
-          # Wait for cert generation to complete, then create secret
-          sleep 5
-          kubectl create secret generic {{ include "elk-stack.fullname" . }}-certs \
-            -n {{ .Values.global.namespace }} \
-            --from-file=/certs/ \
-            --dry-run=client -o yaml | kubectl apply -f -
-        volumeMounts:
-        - name: certs-volume
-          mountPath: /certs
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-cert-generator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-cert-generator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "elk-stack.fullname" . }}-cert-generator
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "elk-stack.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+subjects:
+- kind: ServiceAccount
+  name: {{ include "elk-stack.fullname" . }}-cert-generator
+  namespace: {{ .Values.global.namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "elk-stack.fullname" . }}-cert-generator
+  apiGroup: rbac.authorization.k8s.io
 {{- end }}
