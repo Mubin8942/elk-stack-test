@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "elk-stack.fullname" . }}-elasticsearch-config
+  name: {{ include "elk-stack.fullname" . }}-elasticsearch
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "elk-stack.labels" . | nindent 4 }}
@@ -71,6 +71,31 @@ spec:
             secretKeyRef:
               name: {{ include "elk-stack.fullname" . }}-elasticsearch-secrets
               key: password
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                # Wait for Elasticsearch to be ready
+                until curl -k -s -f "https://localhost:9200/_cluster/health" \
+                  --cert /usr/share/elasticsearch/config/certs/elasticsearch.crt \
+                  --key /usr/share/elasticsearch/config/certs/elasticsearch.key \
+                  --cacert /usr/share/elasticsearch/config/certs/ca.crt \
+                  -u elastic:${ELASTIC_PASSWORD}; do
+                  echo "Waiting for Elasticsearch to be ready..."
+                  sleep 10
+                done
+
+                # Set kibana_system user password
+                curl -k -X POST "https://localhost:9200/_security/user/kibana_system/_password" \
+                  -H "Content-Type: application/json" \
+                  -u elastic:${ELASTIC_PASSWORD} \
+                  --cert /usr/share/elasticsearch/config/certs/elasticsearch.crt \
+                  --key /usr/share/elasticsearch/config/certs/elasticsearch.key \
+                  --cacert /usr/share/elasticsearch/config/certs/ca.crt \
+                  -d '{"password": "kibanapassword"}'
         volumeMounts:
         - name: elasticsearch-config
           mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
@@ -87,7 +112,7 @@ spec:
       volumes:
       - name: elasticsearch-config
         configMap:
-          name: {{ include "elk-stack.fullname" . }}-elasticsearch-config
+          name: {{ include "elk-stack.fullname" . }}-elasticsearch
       {{- if .Values.elasticsearch.ssl.enabled }}
       - name: elasticsearch-certs
         secret:
@@ -134,29 +159,6 @@ spec:
       targetPort: {{ .Values.elasticsearch.service.transportPort }}
       protocol: TCP
   type: {{ .Values.elasticsearch.service.type }}
----
-# Service for internal access (without release name)
-apiVersion: v1
-kind: Service
-metadata:
-  name: elasticsearch
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "elk-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: elasticsearch
-spec:
-  selector:
-    {{- include "elk-stack.elasticsearch.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.elasticsearch.service.httpPort }}
-      targetPort: {{ .Values.elasticsearch.service.httpPort }}
-      protocol: TCP
-    - name: transport
-      port: {{ .Values.elasticsearch.service.transportPort }}
-      targetPort: {{ .Values.elasticsearch.service.transportPort }}
-      protocol: TCP
-  type: ClusterIP
 {{- if .Values.elasticsearch.persistence.enabled }}
 ---
 # Elasticsearch PVC

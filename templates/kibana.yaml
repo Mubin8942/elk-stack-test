@@ -12,9 +12,9 @@ data:
     server.name: kibana
     server.host: "0.0.0.0"
     {{- if .Values.elasticsearch.ssl.enabled }}
-    elasticsearch.hosts: "https://elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"
+    elasticsearch.hosts: "https://{{ include "elk-stack.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"
     {{- else }}
-    elasticsearch.hosts: "http://elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"
+    elasticsearch.hosts: "http://{{ include "elk-stack.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"
     {{- end }}
     elasticsearch.username: "kibana_system"
     elasticsearch.password: {{ .Values.kibana.auth.kibanaPassword | quote }}
@@ -53,7 +53,7 @@ spec:
         env:
         {{- if .Values.elasticsearch.ssl.enabled }}
         - name: ELASTICSEARCH_HOSTS
-          value: "https://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"
+          value: "https://{{ include "elk-stack.fullname" . }}-elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"
         {{- else }}
         - name: ELASTICSEARCH_HOSTS
           value: "http://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"
@@ -125,23 +125,3 @@ spec:
       nodePort: {{ .Values.kibana.service.nodePort }}
       {{- end }}
   type: {{ .Values.kibana.service.type }}
----
-# Service for internal access (without release name)
-apiVersion: v1
-kind: Service
-metadata:
-  name: kibana
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "elk-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: kibana
-spec:
-  selector:
-    {{- include "elk-stack.kibana.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.kibana.service.port }}
-      targetPort: {{ .Values.kibana.service.port }}
-      protocol: TCP
-  type: ClusterIP
-{{- end }}

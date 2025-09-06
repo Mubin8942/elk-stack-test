@@ -19,9 +19,9 @@ data:
 
     output.elasticsearch:
       {{- if .Values.elasticsearch.ssl.enabled }}
-      hosts: ["https://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"]
+      hosts: ["https://{{ include "elk-stack.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"]
       {{- else }}
-      hosts: ["http://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}"]
+      hosts: [""http://{{ include "elk-stack.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"]
       {{- end }}
       username: "elastic"
       password: {{ .Values.elasticsearch.auth.elasticPassword | quote }}
@@ -37,9 +37,9 @@ data:
 
     setup.kibana:
       {{- if .Values.elasticsearch.ssl.enabled }}
-      host: "https://kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}"
+      host: "https://{{ include "elk-stack.fullname" . }}-kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}"
       {{- else }}
-      host: "http://kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}"
+      host: "http://{{ include "elk-stack.fullname" . }}-kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}"
       {{- end }}
 
     logging:
@@ -133,22 +133,3 @@ spec:
       nodePort: {{ .Values.apmServer.service.nodePort }}
       {{- end }}
   type: {{ .Values.apmServer.service.type }}
----
-# Service for internal access (without release name)
-apiVersion: v1
-kind: Service
-metadata:
-  name: apm-server
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "elk-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: apm-server
-spec:
-  selector:
-    {{- include "elk-stack.apmserver.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.apmServer.service.port }}
-      targetPort: {{ .Values.apmServer.service.port }}
-  type: ClusterIP
-{{- end }}

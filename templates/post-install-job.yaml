@@ -27,9 +27,9 @@ spec:
           echo "Waiting for Elasticsearch to be ready..."
           until curl -k -f -s -o /dev/null \
             {{- if .Values.elasticsearch.ssl.enabled }}
-            "https://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_cluster/health" \
+            "https://{{ include "elk-stack.fullname" . }}-elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_cluster/health" \
             {{- else }}
-            "http://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_cluster/health" \
+            "http://{{ include "elk-stack.fullname" . }}-elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_cluster/health" \
             {{- end }}
             -u "elastic:{{ .Values.elasticsearch.auth.elasticPassword }}"; do
             echo "Waiting for Elasticsearch..."
@@ -39,9 +39,9 @@ spec:
           echo "Elasticsearch is ready. Setting up kibana_system user password..."
           curl -k -X POST \
             {{- if .Values.elasticsearch.ssl.enabled }}
-            "https://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_security/user/kibana_system/_password" \
+            "https://{{ include "elk-stack.fullname" . }}-elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_security/user/kibana_system/_password" \
             {{- else }}
-            "http://elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_security/user/kibana_system/_password" \
+            "http://{{ include "elk-stack.fullname" . }}-elasticsearch.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.elasticsearch.service.httpPort }}/_security/user/kibana_system/_password" \
             {{- end }}
             -H "Content-Type: application/json" \
             -u "elastic:{{ .Values.elasticsearch.auth.elasticPassword }}" \
@@ -50,14 +50,14 @@ spec:
           echo "Waiting for Kibana to be ready..."
           sleep 30
           until curl -f -s -o /dev/null \
-            "http://kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}/api/status"; do
+            "http://{{ include "elk-stack.fullname" . }}-kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}/api/status"; do
             echo "Waiting for Kibana..."
             sleep 10
           done
           
           echo "Creating Logstash index pattern in Kibana..."
           curl -X POST \
-            "http://kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}/api/saved_objects/index-pattern" \
+            "http://{{ include "elk-stack.fullname" . }}-kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}/api/saved_objects/index-pattern" \
             -H "kbn-xsrf: true" \
             -H "Content-Type: application/json" \
             -u "elastic:{{ .Values.elasticsearch.auth.elasticPassword }}" \
@@ -71,14 +71,14 @@ spec:
           {{- if .Values.apmServer.enabled }}
           echo "Waiting for APM Server to be ready..."
           until curl -f -s -o /dev/null \
-            "http://apm-server.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.apmServer.service.port }}/"; do
+            "http://{{ include "elk-stack.fullname" . }}-apm-server.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.apmServer.service.port }}/"; do
             echo "Waiting for APM Server..."
             sleep 10
           done
           
           echo "Creating APM index pattern in Kibana..."
           curl -X POST \
-            "http://kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}/api/saved_objects/index-pattern" \
+            "http://{{ include "elk-stack.fullname" . }}-kibana.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.kibana.service.port }}/api/saved_objects/index-pattern" \
             -H "kbn-xsrf: true" \
             -H "Content-Type: application/json" \
             -u "elastic:{{ .Values.elasticsearch.auth.elasticPassword }}" \
