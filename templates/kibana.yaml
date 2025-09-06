@@ -82,18 +82,18 @@ spec:
         {{- end }}
         resources:
           {{- toYaml .Values.kibana.resources | nindent 10 }}
-        readinessProbe:
-          httpGet:
-            path: /api/status
-            port: {{ .Values.kibana.service.port }}
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /api/status
-            port: {{ .Values.kibana.service.port }}
-          initialDelaySeconds: 60
-          periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /api/status
+        #     port: {{ .Values.kibana.service.port }}
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # livenessProbe:
+        #   httpGet:
+        #     path: /api/status
+        #     port: {{ .Values.kibana.service.port }}
+        #   initialDelaySeconds: 60
+        #   periodSeconds: 10
       volumes:
       - name: kibana-config
         configMap:

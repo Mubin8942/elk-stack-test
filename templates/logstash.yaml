@@ -9,12 +9,13 @@ metadata:
     {{- include "elk-stack.labels" . | nindent 4 }}
 data:
   logstash.yml: |
-    http.host: "0.0.0.0"
+    node.name: ${HOSTNAME}
     path.config: /usr/share/logstash/pipeline
     xpack.monitoring.enabled: false
     pipeline.workers: 1
     pipeline.batch.size: 125
     pipeline.batch.delay: 50
+    api.http.host: "0.0.0.0"
 
   pipeline.conf: |
     input {
