@@ -141,7 +141,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "elk-stack.fullname" . }}-elasticsearch
+  name: {{ .Values.elasticsearch.service.name }}
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "elk-stack.labels" . | nindent 4 }}

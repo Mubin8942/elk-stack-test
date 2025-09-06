@@ -35,9 +35,9 @@ data:
     output {
       elasticsearch {
         {{- if .Values.elasticsearch.ssl.enabled }}
-        hosts => ["https://{{ include "elk-stack.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"]
+        hosts => ["https://{{ .Values.elasticsearch.service.name }}:{{ .Values.elasticsearch.service.httpPort }}"]
         {{- else }}
-        hosts => ["http://{{ include "elk-stack.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.httpPort }}"]
+        hosts => ["http://{{ .Values.elasticsearch.service.name }}:{{ .Values.elasticsearch.service.httpPort }}"]
         {{- end }}
         user => "elastic"
         password => {{ .Values.elasticsearch.auth.elasticPassword | quote }}
@@ -117,7 +117,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "elk-stack.fullname" . }}-logstash
+  name: {{ .Values.logstash.service.name }}
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "elk-stack.labels" . | nindent 4 }}

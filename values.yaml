@@ -43,6 +43,7 @@ elasticsearch:
     storageClassName: ""
   
   service:
+    name: elasticsearch
     type: ClusterIP
     httpPort: 9200
     transportPort: 9300
@@ -69,6 +70,7 @@ kibana:
       cpu: "500m"
   
   service:
+    name: kibana
     type: NodePort
     port: 5601
     nodePort: 30601
@@ -97,6 +99,7 @@ logstash:
     lsJavaOpts: "-Xms512m -Xmx512m"
   
   service:
+    name: logstash
     type: ClusterIP
     port: 5044
 
@@ -135,6 +138,7 @@ apmServer:
       cpu: "300m"
   
   service:
+    name: apm-server
     type: NodePort
     port: 8200
     nodePort: 30602
@@ -158,6 +162,7 @@ demoApp:
       cpu: "500m"
   
   service:
+    name: demo-app
     type: NodePort
     port: 3000
     nodePort: 30600

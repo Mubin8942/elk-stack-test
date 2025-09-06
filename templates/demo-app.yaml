@@ -26,7 +26,7 @@ spec:
         - containerPort: {{ .Values.demoApp.service.port }}
         env:
         - name: ELASTIC_APM_SERVER_URL
-          value: "http://apm-server.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.apmServer.service.port }}"
+          value: "http://{{ .Values.apmServer.service.name }}:{{ .Values.apmServer.service.port }}"
         - name: ELASTIC_APM_SERVICE_NAME
           value: "demo-nodejs-app"
         - name: ELASTIC_APM_ENVIRONMENT
@@ -257,7 +257,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "elk-stack.fullname" . }}-demo-app
+  name: {{ .Values.demoApp.service.name }}
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "elk-stack.labels" . | nindent 4 }}

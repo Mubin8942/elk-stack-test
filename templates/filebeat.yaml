@@ -49,7 +49,7 @@ data:
       - add_kubernetes_metadata: ~
 
     output.logstash:
-      hosts: ["{{ include "elk-stack.fullname" . }}-logstash:{{ .Values.logstash.service.port }}"]
+      hosts: ["{{ .Values.logstash.service.name }}:{{ .Values.logstash.service.port }}"]
 
     setup.template.enabled: false
     setup.ilm.enabled: false
