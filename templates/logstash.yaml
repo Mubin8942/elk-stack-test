@@ -129,8 +129,7 @@ spec:
             secretKeyRef:
               name: {{ include "elk-stack.fullname" . }}-elasticsearch-secrets
               key: password
-        - name: ELASTICSEARCH_SSL_ENABLED
-          value: {{ .Values.elasticsearch.ssl.enabled | quote }}
+
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
