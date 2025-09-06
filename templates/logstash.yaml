@@ -79,7 +79,7 @@ spec:
       securityContext:
         fsGroup: 1000
       
-      # Add initContainer to set permissions
+      # Add initContainer to set permissions and copy config files
       initContainers:
       - name: set-permissions
         image: busybox
@@ -87,11 +87,21 @@ spec:
         args:
           - |
             mkdir -p /usr/share/logstash/config /usr/share/logstash/pipeline /usr/share/logstash/data
-            chown -R 1000:1000 /usr/share/logstash/data
-            chmod -R 755 /usr/share/logstash/data
+            cp /tmp/config/logstash.yml /usr/share/logstash/config/logstash.yml
+            cp /tmp/pipeline/pipeline.conf /usr/share/logstash/pipeline/pipeline.conf
+            chown -R 1000:1000 /usr/share/logstash/data /usr/share/logstash/config /usr/share/logstash/pipeline
+            chmod -R 755 /usr/share/logstash/data /usr/share/logstash/config /usr/share/logstash/pipeline
         volumeMounts:
         - name: logstash-data
           mountPath: /usr/share/logstash/data
+        - name: logstash-config
+          mountPath: /usr/share/logstash/config
+        - name: logstash-pipeline
+          mountPath: /usr/share/logstash/pipeline
+        - name: config-source
+          mountPath: /tmp/config
+        - name: pipeline-source
+          mountPath: /tmp/pipeline
         securityContext:
           runAsUser: 0
 
@@ -125,10 +135,9 @@ spec:
           runAsUser: 1000
           runAsGroup: 1000
         volumeMounts:
-        - name: config
-          mountPath: /usr/share/logstash/config/logstash.yml
-          subPath: logstash.yml
-        - name: pipeline-config
+        - name: logstash-config
+          mountPath: /usr/share/logstash/config
+        - name: logstash-pipeline
           mountPath: /usr/share/logstash/pipeline
         - name: logstash-data
           mountPath: /usr/share/logstash/data
@@ -150,18 +159,22 @@ spec:
           initialDelaySeconds: 120
           periodSeconds: 30
       volumes:
-      - name: config
+      - name: config-source
         configMap:
           name: {{ include "elk-stack.fullname" . }}-logstash-pipeline
           items:
             - key: logstash.yml
               path: logstash.yml
-      - name: pipeline-config
+      - name: pipeline-source
         configMap:
           name: {{ include "elk-stack.fullname" . }}-logstash-pipeline
           items:
             - key: pipeline.conf
               path: pipeline.conf
+      - name: logstash-config
+        emptyDir: {}
+      - name: logstash-pipeline
+        emptyDir: {}
       - name: logstash-data
         emptyDir: {}
       {{- if .Values.elasticsearch.ssl.enabled }}
