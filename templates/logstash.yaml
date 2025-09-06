@@ -75,6 +75,10 @@ spec:
       labels:
         {{- include "elk-stack.logstash.selectorLabels" . | nindent 8 }}
     spec:
+      # Add pod level security context
+      securityContext:
+        fsGroup: 1000
+      
       # Add initContainer to set permissions
       initContainers:
       - name: set-permissions
@@ -121,7 +125,6 @@ spec:
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
-          fsGroup: 1000
         volumeMounts:
         - name: config
           mountPath: /usr/share/logstash/config
