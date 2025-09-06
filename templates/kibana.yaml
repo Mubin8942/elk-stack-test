@@ -125,3 +125,4 @@ spec:
       nodePort: {{ .Values.kibana.service.nodePort }}
       {{- end }}
   type: {{ .Values.kibana.service.type }}
+{{- end }}

@@ -131,3 +131,4 @@ spec:
       port: {{ .Values.logstash.service.port }}
       targetPort: {{ .Values.logstash.service.port }}
   type: {{ .Values.logstash.service.type }}
+{{- end }}
