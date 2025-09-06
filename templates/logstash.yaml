@@ -85,17 +85,16 @@ spec:
         image: busybox
         command: ['sh', '-c']
         args:
-          - mkdir -p /usr/share/logstash/config /usr/share/logstash/pipeline /usr/share/logstash/data;
-            chown -R 1000:1000 /usr/share/logstash;
-            chmod -R 755 /usr/share/logstash
+          - |
+            mkdir -p /usr/share/logstash/config /usr/share/logstash/pipeline /usr/share/logstash/data
+            chown -R 1000:1000 /usr/share/logstash/data
+            chmod -R 755 /usr/share/logstash/data
         volumeMounts:
-        - name: config
-          mountPath: /usr/share/logstash/config
-        - name: pipeline-config
-          mountPath: /usr/share/logstash/pipeline
+        - name: logstash-data
+          mountPath: /usr/share/logstash/data
         securityContext:
           runAsUser: 0
-      
+
       containers:
       - name: logstash
         image: {{ .Values.logstash.image.repository }}:{{ .Values.logstash.image.tag }}
@@ -127,9 +126,13 @@ spec:
           runAsGroup: 1000
         volumeMounts:
         - name: config
-          mountPath: /usr/share/logstash/config
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
         - name: pipeline-config
-          mountPath: /usr/share/logstash/pipeline
+          mountPath: /usr/share/logstash/pipeline/logstash.conf
+          subPath: pipeline.conf
+        - name: logstash-data
+          mountPath: /usr/share/logstash/data
         {{- if .Values.elasticsearch.ssl.enabled }}
         - name: certs
           mountPath: /usr/share/logstash/config/certs
@@ -151,9 +154,17 @@ spec:
       - name: config
         configMap:
           name: {{ include "elk-stack.fullname" . }}-logstash-pipeline
+          items:
+            - key: logstash.yml
+              path: logstash.yml
       - name: pipeline-config
         configMap:
           name: {{ include "elk-stack.fullname" . }}-logstash-pipeline
+          items:
+            - key: pipeline.conf
+              path: logstash.conf
+      - name: logstash-data
+        emptyDir: {}
       {{- if .Values.elasticsearch.ssl.enabled }}
       - name: certs
         secret:
