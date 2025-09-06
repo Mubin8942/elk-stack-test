@@ -18,9 +18,10 @@ data:
     api.http.host: "0.0.0.0"
 
   pipeline.conf: |
+    # Remove any hidden characters or BOM if present
     input {
       beats {
-        port => {{ .Values.logstash.service.port }}
+        port => 5044
         host => "0.0.0.0"
       }
     }
@@ -84,7 +85,9 @@ spec:
           protocol: TCP
         env:
         - name: LS_JAVA_OPTS
-          value: {{ .Values.logstash.env.lsJavaOpts | quote }}
+          value: "-Xms512m -Xmx1024m"
+        - name: LOG_LEVEL  # Add this line
+          value: "debug"   # Add this line
         - name: ELASTICSEARCH_HOST
           value: {{ .Values.elasticsearch.service.name | quote }}
         - name: ELASTICSEARCH_PORT
