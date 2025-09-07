@@ -3,10 +3,10 @@ entries:
   elk-stack:
   - apiVersion: v2
     appVersion: 9.1.3
-    created: "2025-09-06T23:11:32.4324042+06:00"
+    created: "2025-09-07T12:15:43.4929141+06:00"
     description: A complete ELK Stack (Elasticsearch, Logstash, Kibana) with Filebeat
       and APM Server
-    digest: 4a6242ad54ce3ae47963e90725bdc9bfb02914a888f486e44e2dfdeb0210577f
+    digest: 2e86f566ebb8c246f08b80cb20b807e24a1a4f95403cd53e1c47a5701ba9eb8d
     home: https://www.elastic.co/
     icon: https://www.elastic.co/static-res/images/elastic-logo-200.png
     keywords:
@@ -29,6 +29,6 @@ entries:
     - https://github.com/elastic/beats
     type: application
     urls:
-    - https://mubin8942.github.io/elk-stack-test/elk-stack-1.0.1.tgz
-    version: 1.0.1
-generated: "2025-09-06T23:11:32.4305271+06:00"
+    - https://mubin8942.github.io/elk-stack-test/elk-stack-1.0.2.tgz
+    version: 1.0.2
+generated: "2025-09-07T12:15:43.491767+06:00"
